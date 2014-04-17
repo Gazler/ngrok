@@ -2,6 +2,7 @@
 package term
 
 import (
+	"code.google.com/p/rsc/qr"
 	termbox "github.com/nsf/termbox-go"
 	"ngrok/client/mvc"
 	"ngrok/log"
@@ -34,7 +35,7 @@ func NewTermView(ctl mvc.Controller) *TermView {
 		flush:    make(chan int),
 		shutdown: make(chan int),
 		Logger:   log.NewPrefixLogger("view", "term"),
-		area:     NewArea(0, 0, w, 10),
+		area:     NewArea(0, 0, w, 100),
 	}
 
 	ctl.Go(v.run)
@@ -53,6 +54,32 @@ func connStatusRepr(status mvc.ConnStatus) (string, termbox.Attribute) {
 		return "online", termbox.ColorGreen
 	}
 	return "unknown", termbox.ColorWhite
+}
+
+func drawQRCode(url string, v *TermView) {
+
+	code, err := qr.Encode(url, 1)
+	if err != nil {
+		panic("Could not encode string")
+	}
+
+	code.Scale = 1
+
+	yoffset := 20
+	xoffset := 20
+	xscale := 2
+
+	b := code.Image().Bounds()
+	for y := b.Min.Y - 2; y < b.Max.Y; y++ {
+		for x := b.Min.X - 2; x < b.Max.X; x++ {
+			if code.Black(x, y) {
+				v.APrintf(termbox.ColorBlack|termbox.AttrReverse, (x*xscale)+xoffset, y+yoffset, "  ")
+			} else {
+				v.APrintf(termbox.ColorWhite|termbox.AttrReverse, (x*xscale)+xoffset, y+yoffset, "  ")
+			}
+		}
+	}
+
 }
 
 func (v *TermView) draw() {
@@ -105,6 +132,7 @@ func (v *TermView) draw() {
 	var i int = 4
 	for _, t := range state.GetTunnels() {
 		v.Printf(0, i, "%-30s%s -> %s", "Forwarding", t.PublicUrl, t.LocalAddr)
+		drawQRCode(t.PublicUrl, v)
 		i++
 	}
 	v.Printf(0, i+0, "%-30s%s", "Web Interface", v.ctl.GetWebInspectAddr())
